@@ -1,15 +1,22 @@
 {
-  "name": "assignment",
-  "version": "0.1.0",
+  "name": "quickpaste",
+  "version": "1.0.0",
   "private": true,
+  "description": "A fast Pastebin-like web application with expiration features",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "prisma generate",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "nanoid": "^5.1.6",
     "next": "16.1.5",
+    "prisma": "^5.22.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

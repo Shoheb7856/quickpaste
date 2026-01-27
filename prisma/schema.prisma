@@ -1,0 +1,26 @@
+// Prisma Schema for PasteBin Clone
+// Supports PostgreSQL (Neon) for deployment
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Paste {
+  id         String    @id @default(cuid())
+  slug       String    @unique
+  title      String?
+  content    String
+  syntax     String    @default("plaintext")
+  expiresAt  DateTime? @map("expires_at")
+  maxViews   Int?      @map("max_views")
+  viewCount  Int       @default(0) @map("view_count")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("pastes")
+}
