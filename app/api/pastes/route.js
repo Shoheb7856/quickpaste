@@ -1,115 +1,87 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateSlug, calculateExpirationDate } from '@/lib/utils';
+import { generateId, calculateExpirationDate, getCurrentTime } from '@/lib/utils';
 
 // POST /api/pastes - Create a new paste
 export async function POST(request) {
     try {
         const body = await request.json();
-        const { content, title, syntax, expiresIn, maxViews } = body;
+        const { content, ttl_seconds, max_views } = body;
 
-        // Validation
-        if (!content || typeof content !== 'string') {
+        // Validation: content is required and must be a non-empty string
+        if (!content || typeof content !== 'string' || content.trim() === '') {
             return NextResponse.json(
-                { error: 'Content is required and must be a string' },
+                { error: 'content is required and must be a non-empty string' },
                 { status: 400 }
             );
         }
 
-        if (content.length > 500000) {
-            return NextResponse.json(
-                { error: 'Content exceeds maximum length of 500,000 characters' },
-                { status: 400 }
-            );
+        // Validation: ttl_seconds must be an integer >= 1 if provided
+        if (ttl_seconds !== undefined && ttl_seconds !== null) {
+            if (!Number.isInteger(ttl_seconds) || ttl_seconds < 1) {
+                return NextResponse.json(
+                    { error: 'ttl_seconds must be an integer >= 1' },
+                    { status: 400 }
+                );
+            }
         }
 
-        // Generate unique slug
-        let slug = generateSlug();
+        // Validation: max_views must be an integer >= 1 if provided
+        if (max_views !== undefined && max_views !== null) {
+            if (!Number.isInteger(max_views) || max_views < 1) {
+                return NextResponse.json(
+                    { error: 'max_views must be an integer >= 1' },
+                    { status: 400 }
+                );
+            }
+        }
+
+        // Generate unique ID
+        let id = generateId();
         let attempts = 0;
         const maxAttempts = 5;
 
-        // Ensure slug is unique
+        // Ensure ID is unique
         while (attempts < maxAttempts) {
-            const existing = await prisma.paste.findUnique({ where: { slug } });
+            const existing = await prisma.paste.findUnique({ where: { slug: id } });
             if (!existing) break;
-            slug = generateSlug();
+            id = generateId();
             attempts++;
         }
 
         if (attempts >= maxAttempts) {
             return NextResponse.json(
-                { error: 'Failed to generate unique slug. Please try again.' },
+                { error: 'Failed to generate unique ID. Please try again.' },
                 { status: 500 }
             );
         }
 
-        // Calculate expiration date
-        const expiresAt = calculateExpirationDate(expiresIn);
+        // Calculate expiration date using current time
+        const currentTime = getCurrentTime(request);
+        const expiresAt = calculateExpirationDate(ttl_seconds, currentTime);
 
         // Create paste
         const paste = await prisma.paste.create({
             data: {
-                slug,
+                slug: id,
                 content,
-                title: title || null,
-                syntax: syntax || 'plaintext',
                 expiresAt,
-                maxViews: maxViews || null,
+                maxViews: max_views || null,
                 viewCount: 0,
             },
         });
 
-        // Build the shareable URL
+        // Build the URL
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.headers.get('origin') || 'http://localhost:3000';
-        const shareableUrl = `${baseUrl}/${paste.slug}`;
+        const url = `${baseUrl}/p/${paste.slug}`;
 
         return NextResponse.json({
-            success: true,
-            paste: {
-                id: paste.id,
-                slug: paste.slug,
-                title: paste.title,
-                syntax: paste.syntax,
-                expiresAt: paste.expiresAt,
-                maxViews: paste.maxViews,
-                createdAt: paste.createdAt,
-                shareableUrl,
-            },
+            id: paste.slug,
+            url,
         }, { status: 201 });
 
     } catch (error) {
         console.error('Error creating paste:', error);
-        return NextResponse.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
-    }
-}
-
-// GET /api/pastes - Get all pastes (for admin/debug purposes, limited)
-export async function GET(request) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const limit = Math.min(parseInt(searchParams.get('limit')) || 10, 50);
-
-        const pastes = await prisma.paste.findMany({
-            select: {
-                id: true,
-                slug: true,
-                title: true,
-                syntax: true,
-                viewCount: true,
-                expiresAt: true,
-                maxViews: true,
-                createdAt: true,
-            },
-            orderBy: { createdAt: 'desc' },
-            take: limit,
-        });
-
-        return NextResponse.json({ pastes });
-    } catch (error) {
-        console.error('Error fetching pastes:', error);
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

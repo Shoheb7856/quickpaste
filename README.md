@@ -1,104 +1,70 @@
-# QuickPaste - Pastebin Clone
+# QuickPaste - Pastebin-Lite
 
-A fast, modern Pastebin-like web application built with Next.js where users can quickly store and share text content with shareable links. Content can optionally expire based on time or number of views.
+A small Pastebin-like application where users can create text pastes and share a link to view them. Pastes can optionally expire based on time (TTL) or view count limits.
 
 ## 🚀 Live Demo
 
-[Your Vercel URL here]
+**Deployed URL:** https://quickpaste-mauve.vercel.app
 
-## ✨ Features
+**Git Repository:** https://github.com/Shoheb7856/quickpaste
 
-- **📝 Create Pastes** - Store any text content instantly
-- **🔗 Shareable Links** - Get a unique URL for each paste
-- **⏰ Time-Based Expiration** - Set pastes to expire after 10 minutes, 1 hour, 1 day, 1 week, or 1 month
-- **👁️ View-Based Expiration** - "Burn after reading" - self-destruct after X views
-- **📄 Syntax Highlighting** - Support for multiple programming languages
-- **🎨 Modern UI** - Beautiful dark theme with glassmorphism effects
-- **📱 Responsive** - Works on all devices
+## 📋 Features
+
+- **Create Pastes**: Store any text content instantly
+- **Shareable Links**: Get a unique URL for each paste (`/p/:id`)
+- **Time-Based Expiry (TTL)**: Pastes auto-expire after a set duration
+- **View-Count Limits**: Pastes self-destruct after N views
+- **Combined Constraints**: If both TTL and view limit are set, paste expires when either triggers first
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
-- **Database**: PostgreSQL (Neon)
+- **Framework**: Next.js 16 (App Router)
+- **Database**: PostgreSQL (Neon - Serverless)
 - **ORM**: Prisma
-- **Styling**: Vanilla CSS with modern design
 - **Deployment**: Vercel
 
-## 📋 API Endpoints
+## 💾 Persistence Layer
 
-### Create a Paste
-```bash
-POST /api/pastes
-Content-Type: application/json
+**PostgreSQL via [Neon](https://neon.tech)** - A serverless PostgreSQL database that:
+- Persists data across serverless function invocations
+- Scales to zero when not in use (cost-effective)
+- Provides instant branching for development
+- Offers a generous free tier suitable for this application
 
-{
-  "content": "Your text content here",
-  "title": "Optional title",
-  "syntax": "javascript",
-  "expiresIn": 60,        # Optional: minutes until expiration (null for never)
-  "maxViews": 5           # Optional: max views before deletion (null for unlimited)
-}
+This choice ensures data survives across requests in Vercel's serverless environment, unlike in-memory storage which would be reset between function invocations.
+
+## 📁 Project Structure
+
+```
+├── app/
+│   ├── api/
+│   │   ├── healthz/route.js     # GET /api/healthz - Health check
+│   │   └── pastes/
+│   │       ├── route.js         # POST /api/pastes - Create paste
+│   │       └── [id]/route.js    # GET /api/pastes/:id - Fetch paste
+│   ├── p/[id]/page.js           # GET /p/:id - View paste (HTML)
+│   ├── page.js                  # Home page (Create paste UI)
+│   └── layout.js                # Root layout
+├── lib/
+│   ├── prisma.js                # Prisma client singleton
+│   └── utils.js                 # Utility functions (ID generation, time handling)
+├── prisma/
+│   └── schema.prisma            # Database schema
+└── README.md
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "paste": {
-    "id": "clxxx...",
-    "slug": "abc123xy",
-    "title": "Optional title",
-    "syntax": "javascript",
-    "expiresAt": "2024-01-27T22:00:00.000Z",
-    "maxViews": 5,
-    "createdAt": "2024-01-27T21:00:00.000Z",
-    "shareableUrl": "https://your-app.vercel.app/abc123xy"
-  }
-}
-```
-
-### Get a Paste
-```bash
-GET /api/pastes/{slug}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "paste": {
-    "id": "clxxx...",
-    "slug": "abc123xy",
-    "title": "Optional title",
-    "content": "Your text content here",
-    "syntax": "javascript",
-    "viewCount": 3,
-    "maxViews": 5,
-    "expiresAt": "2024-01-27T22:00:00.000Z",
-    "createdAt": "2024-01-27T21:00:00.000Z",
-    "willExpireAfterView": false
-  }
-}
-```
-
-### Delete a Paste
-```bash
-DELETE /api/pastes/{slug}
-```
-
-## 🚀 Local Development
+## 🔧 Running Locally
 
 ### Prerequisites
-- Node.js 18+ 
-- npm or yarn
-- PostgreSQL database (or Neon account)
+- Node.js 18+
+- npm
 
 ### Setup
 
 1. **Clone the repository**
 ```bash
-git clone <your-repo-url>
-cd assignment
+git clone https://github.com/Shoheb7856/quickpaste.git
+cd quickpaste
 ```
 
 2. **Install dependencies**
@@ -107,125 +73,104 @@ npm install
 ```
 
 3. **Set up environment variables**
-```bash
-cp .env.example .env
-```
 
-Edit `.env` and add your database connection string:
+Create a `.env` file:
 ```env
-DATABASE_URL="postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
+DATABASE_URL="postgresql://user:password@host/database?sslmode=require"
 NEXT_PUBLIC_BASE_URL="http://localhost:3000"
 ```
 
-4. **Set up the database**
+Get a free PostgreSQL database from [Neon](https://neon.tech).
+
+4. **Push database schema**
 ```bash
-npx prisma generate
 npx prisma db push
 ```
 
-5. **Run the development server**
+5. **Start the development server**
 ```bash
 npm run dev
 ```
 
 Visit [http://localhost:3000](http://localhost:3000)
 
-## 🌐 Deployment to Vercel
+## 📡 API Endpoints
 
-### Step 1: Set up Neon Database
+### Health Check
+```
+GET /api/healthz
+```
+Returns `{ "ok": true }` with HTTP 200 if the application and database are healthy.
 
-1. Go to [Neon.tech](https://neon.tech) and create a free account
-2. Create a new project
-3. Copy the connection string (it looks like `postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`)
+### Create Paste
+```
+POST /api/pastes
+Content-Type: application/json
 
-### Step 2: Deploy to Vercel
-
-1. Push your code to GitHub
-2. Go to [Vercel](https://vercel.com) and import your repository
-3. Add environment variables:
-   - `DATABASE_URL`: Your Neon connection string
-   - `NEXT_PUBLIC_BASE_URL`: Your Vercel deployment URL (e.g., `https://your-app.vercel.app`)
-4. Deploy!
-
-### Step 3: Run Database Migration
-
-After deployment, run the following command to create the database tables:
-```bash
-npx prisma db push
+{
+  "content": "Hello World",    // Required, non-empty string
+  "ttl_seconds": 60,           // Optional, integer >= 1
+  "max_views": 5               // Optional, integer >= 1
+}
 ```
 
-Or via Vercel CLI:
-```bash
-vercel env pull .env.local
-npx prisma db push
+Response (201):
+```json
+{
+  "id": "abc123xy",
+  "url": "https://quickpaste-mauve.vercel.app/p/abc123xy"
+}
 ```
 
-## 📁 Project Structure
-
+### Fetch Paste (API)
 ```
-assignment/
-├── app/
-│   ├── api/
-│   │   └── pastes/
-│   │       ├── route.js          # POST /api/pastes, GET /api/pastes
-│   │       └── [slug]/
-│   │           └── route.js      # GET/DELETE /api/pastes/{slug}
-│   ├── [slug]/
-│   │   └── page.js               # View paste page
-│   ├── globals.css               # Global styles
-│   ├── layout.js                 # Root layout
-│   └── page.js                   # Home page (create paste)
-├── lib/
-│   ├── prisma.js                 # Prisma client singleton
-│   └── utils.js                  # Utility functions
-├── prisma/
-│   └── schema.prisma             # Database schema
-├── .env.example                  # Environment variables template
-└── README.md
+GET /api/pastes/:id
 ```
 
-## 🔧 Expiration Options
+Response (200):
+```json
+{
+  "content": "Hello World",
+  "remaining_views": 4,        // null if unlimited
+  "expires_at": "2026-01-28T12:00:00.000Z"  // null if no TTL
+}
+```
 
-### Time-Based
-| Option | Duration |
-|--------|----------|
-| Never | No expiration |
-| 10 Minutes | 600 seconds |
-| 1 Hour | 3,600 seconds |
-| 1 Day | 86,400 seconds |
-| 1 Week | 604,800 seconds |
-| 1 Month | 2,592,000 seconds |
+Each API fetch counts as a view. Returns 404 if paste is missing, expired, or view limit exceeded.
 
-### View-Based
-| Option | Views |
-|--------|-------|
-| Unlimited | No limit |
-| Burn After Reading | 1 view |
-| 5 Views | 5 views |
-| 10 Views | 10 views |
-| 50 Views | 50 views |
-| 100 Views | 100 views |
+### View Paste (HTML)
+```
+GET /p/:id
+```
+Returns HTML page displaying the paste content. Returns HTTP 404 if unavailable.
+
+## 🧪 Testing Features
+
+### Deterministic Time Testing
+When `TEST_MODE=1` environment variable is set:
+- The `x-test-now-ms` request header is treated as the current time for expiry logic
+- Allows automated tests to verify TTL behavior
+
+### Validation
+- `content` is required and must be a non-empty string
+- `ttl_seconds` must be an integer >= 1 if provided
+- `max_views` must be an integer >= 1 if provided
+- Invalid inputs return 400 with JSON error body
 
 ## 🎯 Design Decisions
 
-1. **Next.js App Router**: Chosen for its modern architecture, server components, and excellent Vercel integration.
+1. **Neon PostgreSQL**: Chose Neon for persistence because it's serverless-friendly, has a generous free tier, and works seamlessly with Vercel's serverless functions.
 
-2. **Prisma ORM**: Type-safe database access with easy migrations and excellent PostgreSQL support.
+2. **View Count Before Check**: Views are incremented atomically to prevent race conditions under concurrent load. The check happens before increment to ensure accurate remaining count.
 
-3. **Neon PostgreSQL**: Serverless PostgreSQL that scales to zero, perfect for a free-tier deployment.
+3. **Nanoid for IDs**: Using nanoid with a custom alphabet (no confusing characters like 0/O, 1/l) for URL-safe, human-readable paste IDs.
 
-4. **Nanoid for Slugs**: Generates URL-safe, unique 8-character slugs that are easy to share.
+4. **HTML Escaping**: Content is escaped using a custom function to prevent XSS attacks when rendering pastes.
 
-5. **CSS-only Design**: No external CSS frameworks for maximum control and minimal bundle size.
+5. **404 for All Unavailable States**: Whether a paste is missing, expired by time, or exceeded view limit - all return HTTP 404 with consistent JSON error body.
 
-6. **View Counting on Read**: Views are incremented atomically when fetching a paste, ensuring accurate counts.
+6. **Combined Constraint Logic**: When both TTL and max_views are set, the paste becomes unavailable as soon as either constraint triggers.
 
-7. **Lazy Deletion**: Expired pastes are deleted when accessed, not via background jobs, keeping the architecture simple.
+## 📝 License
 
-## 📄 License
-
-MIT License
-
----
-
-Built with ❤️ for the take-home assignment
+MIT

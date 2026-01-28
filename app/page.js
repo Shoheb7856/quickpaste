@@ -1,19 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
-const EXPIRATION_OPTIONS = [
-  { label: 'Never', value: '' },
-  { label: '10 Minutes', value: '10' },
-  { label: '1 Hour', value: '60' },
-  { label: '1 Day', value: '1440' },
-  { label: '1 Week', value: '10080' },
-  { label: '1 Month', value: '43200' },
+const TTL_OPTIONS = [
+  { label: 'Never expires', value: '' },
+  { label: '1 Minute', value: '60' },
+  { label: '10 Minutes', value: '600' },
+  { label: '1 Hour', value: '3600' },
+  { label: '1 Day', value: '86400' },
+  { label: '1 Week', value: '604800' },
 ];
 
 const VIEW_LIMIT_OPTIONS = [
-  { label: 'Unlimited', value: '' },
+  { label: 'Unlimited views', value: '' },
   { label: '1 View (Burn after reading)', value: '1' },
   { label: '5 Views', value: '5' },
   { label: '10 Views', value: '10' },
@@ -21,46 +20,20 @@ const VIEW_LIMIT_OPTIONS = [
   { label: '100 Views', value: '100' },
 ];
 
-const SYNTAX_OPTIONS = [
-  { label: 'Plain Text', value: 'plaintext' },
-  { label: 'JavaScript', value: 'javascript' },
-  { label: 'Python', value: 'python' },
-  { label: 'HTML', value: 'html' },
-  { label: 'CSS', value: 'css' },
-  { label: 'JSON', value: 'json' },
-  { label: 'SQL', value: 'sql' },
-  { label: 'Markdown', value: 'markdown' },
-  { label: 'Java', value: 'java' },
-  { label: 'C++', value: 'cpp' },
-  { label: 'PHP', value: 'php' },
-  { label: 'TypeScript', value: 'typescript' },
-];
-
 export default function HomePage() {
-  const router = useRouter();
   const [content, setContent] = useState('');
-  const [title, setTitle] = useState('');
-  const [syntax, setSyntax] = useState('plaintext');
-  const [expiresIn, setExpiresIn] = useState('');
+  const [ttlSeconds, setTtlSeconds] = useState('');
   const [maxViews, setMaxViews] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
-
-  const MAX_CHARS = 500000;
-  const charCount = content.length;
-  const charPercentage = (charCount / MAX_CHARS) * 100;
+  const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!content.trim()) {
-      setError('Please enter some content to paste');
-      return;
-    }
-
-    if (content.length > MAX_CHARS) {
-      setError('Content exceeds maximum length');
+      setError('Please enter some content');
       return;
     }
 
@@ -68,16 +41,22 @@ export default function HomePage() {
     setError('');
 
     try {
+      const payload = {
+        content: content,
+      };
+
+      // Only add optional fields if they have values
+      if (ttlSeconds) {
+        payload.ttl_seconds = parseInt(ttlSeconds, 10);
+      }
+      if (maxViews) {
+        payload.max_views = parseInt(maxViews, 10);
+      }
+
       const response = await fetch('/api/pastes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content,
-          title: title.trim() || null,
-          syntax,
-          expiresIn: expiresIn ? parseInt(expiresIn) : null,
-          maxViews: maxViews ? parseInt(maxViews) : null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -86,7 +65,7 @@ export default function HomePage() {
         throw new Error(data.error || 'Failed to create paste');
       }
 
-      setSuccess(data.paste);
+      setSuccess(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -97,7 +76,8 @@ export default function HomePage() {
   const copyToClipboard = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
-      // Visual feedback would be added here
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
     }
@@ -105,12 +85,11 @@ export default function HomePage() {
 
   const resetForm = () => {
     setContent('');
-    setTitle('');
-    setSyntax('plaintext');
-    setExpiresIn('');
+    setTtlSeconds('');
     setMaxViews('');
     setSuccess(null);
     setError('');
+    setCopied(false);
   };
 
   // Success view after paste creation
@@ -119,7 +98,7 @@ export default function HomePage() {
       <div className="animate-slideUp">
         <div className="card">
           <div className="card-header">
-            <h1 className="card-title">✨ Paste Created Successfully!</h1>
+            <h1 className="card-title">✨ Paste Created!</h1>
           </div>
           <div className="card-body">
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
@@ -136,11 +115,6 @@ export default function HomePage() {
               }}>
                 ✓
               </div>
-              {success.title && (
-                <h2 style={{ fontSize: '24px', fontWeight: '600', marginBottom: '8px' }}>
-                  {success.title}
-                </h2>
-              )}
               <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
                 Your paste is ready to share
               </p>
@@ -152,36 +126,32 @@ export default function HomePage() {
                 <input
                   type="text"
                   readOnly
-                  value={success.shareableUrl}
+                  value={success.url}
                   className="share-url-input"
                 />
                 <button
                   className="btn btn-primary"
-                  onClick={() => copyToClipboard(success.shareableUrl)}
+                  onClick={() => copyToClipboard(success.url)}
                 >
-                  📋 Copy Link
+                  {copied ? '✓ Copied!' : '📋 Copy'}
                 </button>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '24px', justifyContent: 'center' }}>
-              {success.expiresAt && (
-                <span className="badge badge-warning">
-                  ⏱️ Expires: {new Date(success.expiresAt).toLocaleString()}
-                </span>
-              )}
-              {success.maxViews && (
-                <span className="badge badge-warning">
-                  👁️ Max Views: {success.maxViews}
-                </span>
-              )}
-              <span className="badge">
-                📝 Syntax: {success.syntax}
-              </span>
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              <code style={{
+                color: 'var(--text-tertiary)',
+                fontSize: '13px',
+                background: 'var(--bg-tertiary)',
+                padding: '4px 8px',
+                borderRadius: '4px'
+              }}>
+                ID: {success.id}
+              </code>
             </div>
 
             <div style={{ display: 'flex', gap: '16px', marginTop: '32px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <a href={`/${success.slug}`} className="btn btn-secondary">
+              <a href={success.url} className="btn btn-secondary" target="_blank" rel="noopener noreferrer">
                 👀 View Paste
               </a>
               <button className="btn btn-primary" onClick={resetForm}>
@@ -199,7 +169,7 @@ export default function HomePage() {
       <div className="card">
         <div className="card-header">
           <h1 className="card-title">📝 New Paste</h1>
-          <span className="badge">Quick Share</span>
+          <span className="badge">Pastebin-Lite</span>
         </div>
         <div className="card-body">
           <form onSubmit={handleSubmit}>
@@ -218,21 +188,6 @@ export default function HomePage() {
             )}
 
             <div className="form-group">
-              <label className="form-label" htmlFor="title">
-                Title (Optional)
-              </label>
-              <input
-                type="text"
-                id="title"
-                className="form-input"
-                placeholder="Give your paste a title..."
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={100}
-              />
-            </div>
-
-            <div className="form-group">
               <label className="form-label" htmlFor="content">
                 Content *
               </label>
@@ -243,42 +198,22 @@ export default function HomePage() {
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 required
+                style={{ minHeight: '200px' }}
               />
-              <div className={`char-counter ${charPercentage > 90 ? 'warning' : ''} ${charPercentage >= 100 ? 'error' : ''}`}>
-                {charCount.toLocaleString()} / {MAX_CHARS.toLocaleString()} characters
-              </div>
             </div>
 
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label" htmlFor="syntax">
-                  📄 Syntax Highlighting
+                <label className="form-label" htmlFor="ttlSeconds">
+                  ⏱️ Expiration (TTL)
                 </label>
                 <select
-                  id="syntax"
+                  id="ttlSeconds"
                   className="form-select"
-                  value={syntax}
-                  onChange={(e) => setSyntax(e.target.value)}
+                  value={ttlSeconds}
+                  onChange={(e) => setTtlSeconds(e.target.value)}
                 >
-                  {SYNTAX_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="expiresIn">
-                  ⏱️ Expiration
-                </label>
-                <select
-                  id="expiresIn"
-                  className="form-select"
-                  value={expiresIn}
-                  onChange={(e) => setExpiresIn(e.target.value)}
-                >
-                  {EXPIRATION_OPTIONS.map((option) => (
+                  {TTL_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -338,18 +273,18 @@ export default function HomePage() {
               <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '24px' }}>⏰</span>
                 <div>
-                  <strong style={{ color: 'var(--text-primary)' }}>Auto Expiration</strong>
+                  <strong style={{ color: 'var(--text-primary)' }}>Time-to-Live</strong>
                   <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                    Set time-based expiration
+                    Auto-expire after set duration
                   </p>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: '24px' }}>🔥</span>
                 <div>
-                  <strong style={{ color: 'var(--text-primary)' }}>Burn After Reading</strong>
+                  <strong style={{ color: 'var(--text-primary)' }}>View Limits</strong>
                   <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                    Self-destruct after X views
+                    Self-destruct after N views
                   </p>
                 </div>
               </div>
